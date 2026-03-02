@@ -15,6 +15,17 @@ function parseCitationMarkers(text: string): number[] {
 	return [...indices].sort((a, b) => a - b);
 }
 
+/** Extract Guardian URLs from response text that weren't in our retrieved sources. */
+function parseInlineUrls(text: string, knownUrls: Set<string>): string[] {
+	const urlPattern = /https?:\/\/(?:www\.)?theguardian\.com\/[^\s)"\]]+/g;
+	const found = new Set<string>();
+	for (const match of text.matchAll(urlPattern)) {
+		const url = match[0].replace(/[.,;:]+$/, ''); // strip trailing punctuation
+		if (!knownUrls.has(url)) found.add(url);
+	}
+	return [...found];
+}
+
 /** Deduplicate sources by URL, keeping the first occurrence. */
 function deduplicateSources(sources: ArticleSummary[]): ArticleSummary[] {
 	const seen = new Set<string>();
@@ -161,12 +172,17 @@ export const POST: RequestHandler = async ({ request }) => {
 				const validCited = citedIndices.filter((i) => i >= 0 && i < citableSources.length);
 				const citedUrls = validCited.map((i) => citableSources[i].url);
 
-				if (citedUrls.length > 0) {
-					await emitEvents(sid, 'content_cited', citedUrls);
+				// Also pick up Guardian URLs the model found inside article body text
+				const knownUrls = new Set(citableSources.map((s) => s.url));
+				const inlineUrls = parseInlineUrls(fullResponse, knownUrls);
+				const allCitedUrls = [...citedUrls, ...inlineUrls];
+
+				if (allCitedUrls.length > 0) {
+					await emitEvents(sid, 'content_cited', allCitedUrls);
 					send('telemetry', {
 						type: 'content_cited',
-						count: citedUrls.length,
-						urls: citedUrls
+						count: allCitedUrls.length,
+						urls: allCitedUrls
 					});
 				}
 
