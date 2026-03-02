@@ -115,8 +115,8 @@
 					<div class="events-list">
 						{#each recentEvents as event}
 							<div class="event-row">
-								<span class="event-badge" class:retrieved={event.event_type === 'content_retrieved'} class:cited={event.event_type === 'content_cited'}>
-									{event.event_type === 'content_retrieved' ? 'RET' : 'CIT'}
+								<span class="event-badge" class:retrieved={event.event_type === 'content_retrieved'} class:cited={event.event_type === 'content_cited'} class:engaged={event.event_type === 'content_engaged'}>
+									{event.event_type === 'content_retrieved' ? 'RET' : event.event_type === 'content_cited' ? 'CIT' : 'ENG'}
 								</span>
 								<span class="event-url">{event.content_url ? shortUrl(event.content_url) : '-'}</span>
 								<span class="event-time">{formatTime(event.event_timestamp)}</span>
@@ -227,7 +227,7 @@
 
 	.url-path {
 		font-size: 0.7rem;
-		color: #60a5fa;
+		color: #a78bfa;
 		text-decoration: none;
 		font-family: 'SF Mono', 'Fira Code', monospace;
 		display: block;
@@ -270,13 +270,18 @@
 	}
 
 	.event-badge.retrieved {
-		background: #1e3a5f;
-		color: #60a5fa;
+		background: #1e0a3f;
+		color: #a78bfa;
 	}
 
 	.event-badge.cited {
 		background: #14532d;
 		color: #4ade80;
+	}
+
+	.event-badge.engaged {
+		background: #422006;
+		color: #fbbf24;
 	}
 
 	.event-url {

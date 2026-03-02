@@ -41,7 +41,7 @@ export interface Citation {
 
 // Telemetry
 export interface TelemetryEvent {
-	type: 'content_retrieved' | 'content_cited';
+	type: 'content_retrieved' | 'content_cited' | 'content_engaged';
 	count: number;
 	urls: string[];
 	timestamp: string;

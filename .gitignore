@@ -11,12 +11,19 @@ venv/
 dist/
 build/
 
+# Node
+node_modules/
+
+# SvelteKit
+.svelte-kit/
+.vercel/
+
 # Claude Code
 .claude/settings.local.json
 
 # Environment
 .env
-.env.*
+!.env.example
 
 # OS
 .DS_Store

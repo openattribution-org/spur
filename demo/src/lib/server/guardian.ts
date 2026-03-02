@@ -20,7 +20,15 @@ export interface GuardianResult {
 	};
 }
 
-export async function searchGuardian(query: string, pageSize = 5): Promise<GuardianResult[]> {
+export interface GuardianSearchOptions {
+	query: string;
+	tag?: string;
+	pageSize?: number;
+}
+
+export async function searchGuardian(options: GuardianSearchOptions): Promise<GuardianResult[]> {
+	const { query, tag, pageSize = 5 } = options;
+
 	const params = new URLSearchParams({
 		q: query,
 		'show-fields': 'headline,byline,body,standfirst,wordcount',
@@ -28,6 +36,7 @@ export async function searchGuardian(query: string, pageSize = 5): Promise<Guard
 		'order-by': 'relevance',
 		'api-key': GUARDIAN_API_KEY
 	});
+	if (tag) params.set('tag', tag);
 
 	const res = await fetch(`${BASE_URL}/search?${params}`);
 	if (!res.ok) throw new Error(`Guardian API error: ${res.status}`);

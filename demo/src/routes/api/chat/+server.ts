@@ -1,7 +1,9 @@
 import type { RequestHandler } from './$types';
+import type { ArticleSummary } from '$lib/types';
 import { searchGuardian, truncateBody } from '$lib/server/guardian';
+import type { GuardianResult } from '$lib/server/guardian';
 import { startSession, emitEvents } from '$lib/server/oa';
-import { streamMistralChat } from '$lib/server/mistral';
+import { streamMistralChat, extractSearchQuery } from '$lib/server/mistral';
 
 function parseCitationMarkers(text: string): number[] {
 	const matches = text.matchAll(/\[(\d+)\]/g);
@@ -13,8 +15,18 @@ function parseCitationMarkers(text: string): number[] {
 	return [...indices].sort((a, b) => a - b);
 }
 
+/** Deduplicate sources by URL, keeping the first occurrence. */
+function deduplicateSources(sources: ArticleSummary[]): ArticleSummary[] {
+	const seen = new Set<string>();
+	return sources.filter((s) => {
+		if (seen.has(s.url)) return false;
+		seen.add(s.url);
+		return true;
+	});
+}
+
 export const POST: RequestHandler = async ({ request }) => {
-	const { message, history = [], sessionId } = await request.json();
+	const { message, history = [], sessionId, existingSources = [] } = await request.json();
 
 	const encoder = new TextEncoder();
 	const stream = new ReadableStream({
@@ -24,19 +36,31 @@ export const POST: RequestHandler = async ({ request }) => {
 			};
 
 			try {
-				// 1. Search Guardian
-				const articles = await searchGuardian(message);
-				send('sources', {
-					articles: articles.map((a) => ({
+				// 1. Decide whether we need a new search
+				const hasExisting = existingSources.length > 0;
+				const searchParams = await extractSearchQuery(message, history, hasExisting);
+
+				let newArticles: GuardianResult[] = [];
+				let allSources: ArticleSummary[] = [...existingSources];
+
+				if (searchParams.needsSearch) {
+					// 2a. Search Guardian for new articles
+					newArticles = await searchGuardian(searchParams);
+					const newSources: ArticleSummary[] = newArticles.map((a) => ({
 						url: a.webUrl,
 						headline: a.fields?.headline ?? a.webTitle,
 						byline: a.fields?.byline ?? null,
 						section: a.sectionName,
 						date: a.webPublicationDate
-					}))
-				});
+					}));
 
-				// 2. Start or reuse OA session
+					// Merge with existing, dedup by URL
+					allSources = deduplicateSources([...existingSources, ...newSources]);
+
+					send('sources', { articles: newSources });
+				}
+
+				// 3. Start or reuse OA session
 				let sid = sessionId;
 				if (!sid) {
 					const res = await startSession();
@@ -44,9 +68,9 @@ export const POST: RequestHandler = async ({ request }) => {
 					send('session', { session_id: sid });
 				}
 
-				// 3. Emit content_retrieved events
-				const retrievedUrls = articles.map((a) => a.webUrl);
-				if (retrievedUrls.length > 0) {
+				// 4. Emit content_retrieved for new articles only
+				if (newArticles.length > 0) {
+					const retrievedUrls = newArticles.map((a) => a.webUrl);
 					await emitEvents(sid, 'content_retrieved', retrievedUrls);
 					send('telemetry', {
 						type: 'content_retrieved',
@@ -55,15 +79,42 @@ export const POST: RequestHandler = async ({ request }) => {
 					});
 				}
 
-				// 4. Build Mistral prompt
-				const context = articles
-					.map((a, i) => {
-						const headline = a.fields?.headline ?? a.webTitle;
-						const standfirst = a.fields?.standfirst ?? '';
-						const body = a.fields?.body ? truncateBody(a.fields.body, 2000) : '';
-						return `[${i + 1}] ${headline}\nURL: ${a.webUrl}\n${standfirst}\n${body}`;
-					})
-					.join('\n\n---\n\n');
+				// 5. Build context from all available sources
+				// New articles have full body text; existing sources have summary only
+				const contextParts: string[] = [];
+
+				// Full-text context from freshly fetched articles
+				for (let i = 0; i < newArticles.length; i++) {
+					const a = newArticles[i];
+					const headline = a.fields?.headline ?? a.webTitle;
+					const standfirst = a.fields?.standfirst ?? '';
+					const body = a.fields?.body ? truncateBody(a.fields.body, 2000) : '';
+					contextParts.push(`[${i + 1}] ${headline}\nURL: ${a.webUrl}\n${standfirst}\n${body}`);
+				}
+
+				// Summary context from previously retrieved articles (no body text available)
+				const offset = newArticles.length;
+				const previousSources = allSources.filter(
+					(s) => !newArticles.some((a) => a.webUrl === s.url)
+				);
+				for (let i = 0; i < previousSources.length; i++) {
+					const s = previousSources[i];
+					contextParts.push(`[${offset + i + 1}] ${s.headline}\nURL: ${s.url}\nSection: ${s.section}`);
+				}
+
+				// Build the source list the model will cite from (maintains [n] numbering)
+				const citableSources: ArticleSummary[] = [
+					...newArticles.map((a) => ({
+						url: a.webUrl,
+						headline: a.fields?.headline ?? a.webTitle,
+						byline: a.fields?.byline ?? null,
+						section: a.sectionName,
+						date: a.webPublicationDate
+					})),
+					...previousSources
+				];
+
+				const context = contextParts.join('\n\n---\n\n');
 
 				const systemPrompt =
 					`You are a research assistant powered by Guardian journalism. ` +
@@ -84,17 +135,17 @@ export const POST: RequestHandler = async ({ request }) => {
 					}
 				];
 
-				// 5. Stream Mistral response
+				// 6. Stream Mistral response
 				let fullResponse = '';
 				for await (const chunk of streamMistralChat(messages)) {
 					fullResponse += chunk;
 					send('token', { text: chunk });
 				}
 
-				// 6. Parse citations and emit content_cited
+				// 7. Parse citations and emit content_cited
 				const citedIndices = parseCitationMarkers(fullResponse);
-				const validCited = citedIndices.filter((i) => i >= 0 && i < articles.length);
-				const citedUrls = validCited.map((i) => articles[i].webUrl);
+				const validCited = citedIndices.filter((i) => i >= 0 && i < citableSources.length);
+				const citedUrls = validCited.map((i) => citableSources[i].url);
 
 				if (citedUrls.length > 0) {
 					await emitEvents(sid, 'content_cited', citedUrls);
@@ -105,13 +156,14 @@ export const POST: RequestHandler = async ({ request }) => {
 					});
 				}
 
-				// 7. Done
+				// 8. Done - send all citable sources so client can link citations
 				send('done', {
 					session_id: sid,
+					allSources: citableSources,
 					citations: validCited.map((i) => ({
 						marker: `[${i + 1}]`,
-						url: articles[i]?.webUrl,
-						headline: articles[i]?.fields?.headline ?? articles[i]?.webTitle
+						url: citableSources[i]?.url,
+						headline: citableSources[i]?.headline
 					}))
 				});
 			} catch (err) {

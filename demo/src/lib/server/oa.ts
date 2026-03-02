@@ -38,10 +38,18 @@ export async function startSession(): Promise<{ session_id: string }> {
 
 export async function emitEvents(
 	sessionId: string,
-	eventType: 'content_retrieved' | 'content_cited',
-	contentUrls: string[]
+	eventType: 'content_retrieved' | 'content_cited' | 'content_engaged',
+	contentUrls: string[],
+	eventData: Record<string, unknown> = {}
 ): Promise<{ status: string; events_created: number }> {
 	const now = new Date().toISOString();
+	const defaultData =
+		eventType === 'content_cited'
+			? { citation_type: 'reference' }
+			: eventType === 'content_engaged'
+				? { engagement_type: 'click', ...eventData }
+				: {};
+
 	return oaFetch('/events', {
 		method: 'POST',
 		body: JSON.stringify({
@@ -51,7 +59,7 @@ export async function emitEvents(
 				type: eventType,
 				timestamp: now,
 				content_url: url,
-				data: eventType === 'content_cited' ? { citation_type: 'reference' } : {}
+				data: defaultData
 			}))
 		})
 	});

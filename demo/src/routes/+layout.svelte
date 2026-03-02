@@ -4,7 +4,7 @@
 
 <div class="app">
 	<header>
-		<div class="logo">SPUR</div>
+		<img class="logo" src="/spur-logo.png" alt="SPUR" />
 		<div class="title">Live telemetry demo</div>
 		<div class="subtitle">OpenAttribution Telemetry + Guardian content</div>
 	</header>
@@ -44,13 +44,8 @@
 	}
 
 	.logo {
-		font-size: 1.1rem;
-		font-weight: 700;
-		letter-spacing: 0.15em;
-		color: #fff;
-		padding: 0.25rem 0.5rem;
-		border: 1px solid #404040;
-		border-radius: 4px;
+		height: 1.4rem;
+		filter: invert(1);
 	}
 
 	.title {

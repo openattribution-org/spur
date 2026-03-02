@@ -38,11 +38,14 @@
 </script>
 
 <div class="telemetry-container">
-	{#if sessionId}
-		<div class="session-badge">
-			Session: <code>{sessionId.slice(0, 8)}...</code>
-		</div>
-	{/if}
+	<div class="legend">
+		<span class="legend-item"><span class="dot retrieved-dot"></span> retrieved</span>
+		<span class="legend-item"><span class="dot cited-dot"></span> cited</span>
+		<span class="legend-item"><span class="dot engaged-dot"></span> engaged</span>
+		{#if sessionId}
+			<span class="session-id">Session: <code>{sessionId.slice(0, 8)}...</code></span>
+		{/if}
+	</div>
 
 	<div class="events" bind:this={eventsEl}>
 		{#if events.length === 0}
@@ -53,10 +56,10 @@
 		{/if}
 
 		{#each events as event, i}
-			<div class="event" class:retrieved={event.type === 'content_retrieved'} class:cited={event.type === 'content_cited'}>
+			<div class="event" class:retrieved={event.type === 'content_retrieved'} class:cited={event.type === 'content_cited'} class:engaged={event.type === 'content_engaged'}>
 				<div class="event-header">
-					<span class="badge" class:badge-retrieved={event.type === 'content_retrieved'} class:badge-cited={event.type === 'content_cited'}>
-						{event.type === 'content_retrieved' ? 'RETRIEVED' : 'CITED'}
+					<span class="badge" class:badge-retrieved={event.type === 'content_retrieved'} class:badge-cited={event.type === 'content_cited'} class:badge-engaged={event.type === 'content_engaged'}>
+						{event.type === 'content_retrieved' ? 'RETRIEVED' : event.type === 'content_cited' ? 'CITED' : 'ENGAGED'}
 					</span>
 					<span class="count">{event.count} URL{event.count !== 1 ? 's' : ''}</span>
 					<span class="time">{formatTime(event.timestamp)}</span>
@@ -70,10 +73,6 @@
 		{/each}
 	</div>
 
-	<div class="legend">
-		<span class="legend-item"><span class="dot retrieved-dot"></span> content_retrieved</span>
-		<span class="legend-item"><span class="dot cited-dot"></span> content_cited</span>
-	</div>
 </div>
 
 <style>
@@ -83,17 +82,13 @@
 		height: 100%;
 	}
 
-	.session-badge {
-		padding: 0.4rem 1rem;
-		background: #1a1a1a;
-		border-bottom: 1px solid #262626;
-		font-size: 0.7rem;
-		color: #737373;
-		flex-shrink: 0;
+	.session-id {
+		margin-left: auto;
+		color: #525252;
 	}
 
-	.session-badge code {
-		color: #a3a3a3;
+	.session-id code {
+		color: #737373;
 		font-family: 'SF Mono', 'Fira Code', monospace;
 	}
 
@@ -131,11 +126,15 @@
 	}
 
 	.event.retrieved {
-		border-left: 3px solid #3b82f6;
+		border-left: 3px solid #5400f9;
 	}
 
 	.event.cited {
 		border-left: 3px solid #22c55e;
+	}
+
+	.event.engaged {
+		border-left: 3px solid #f59e0b;
 	}
 
 	.event-header {
@@ -154,13 +153,18 @@
 	}
 
 	.badge-retrieved {
-		background: #1e3a5f;
-		color: #60a5fa;
+		background: #1e0a3f;
+		color: #a78bfa;
 	}
 
 	.badge-cited {
 		background: #14532d;
 		color: #4ade80;
+	}
+
+	.badge-engaged {
+		background: #422006;
+		color: #fbbf24;
 	}
 
 	.count {
@@ -197,11 +201,12 @@
 
 	.legend {
 		display: flex;
-		gap: 1rem;
-		padding: 0.5rem 1rem;
-		border-top: 1px solid #262626;
+		align-items: center;
+		gap: 0.75rem;
+		padding: 0.4rem 1rem;
+		border-bottom: 1px solid #262626;
 		background: #141414;
-		font-size: 0.65rem;
+		font-size: 0.6rem;
 		color: #525252;
 		flex-shrink: 0;
 	}
@@ -219,10 +224,14 @@
 	}
 
 	.retrieved-dot {
-		background: #3b82f6;
+		background: #5400f9;
 	}
 
 	.cited-dot {
 		background: #22c55e;
+	}
+
+	.engaged-dot {
+		background: #f59e0b;
 	}
 </style>

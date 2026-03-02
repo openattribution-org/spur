@@ -1,9 +1,0 @@
-{
-	"/": [],
-	"/api/chat": [
-		"src/routes/api/chat/+server.ts"
-	],
-	"/api/publisher": [
-		"src/routes/api/publisher/+server.ts"
-	]
-}
