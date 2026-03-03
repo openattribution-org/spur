@@ -48,6 +48,13 @@ export interface TelemetryEvent {
 }
 
 // Publisher dashboard
+export interface AgentBreakdown {
+	platform_id: string | null;
+	agent_id: string | null;
+	event_count: number;
+	session_count: number;
+}
+
 export interface PublisherSummary {
 	publisher_id: string;
 	publisher_name: string;
@@ -55,6 +62,7 @@ export interface PublisherSummary {
 	total_events: number;
 	total_sessions: number;
 	events_by_type: EventTypeCount[];
+	agents: AgentBreakdown[];
 	period_start: string | null;
 	period_end: string | null;
 }
@@ -71,6 +79,8 @@ export interface PublisherEvent {
 	content_url: string | null;
 	event_timestamp: string;
 	event_data: Record<string, unknown>;
+	platform_id: string | null;
+	agent_id: string | null;
 }
 
 export interface PublisherUrlMetric {

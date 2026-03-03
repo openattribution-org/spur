@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { PublisherSummary, PublisherEvent, PublisherUrlMetric, Paginated } from '$lib/types';
+	import type { PublisherSummary, PublisherEvent, PublisherUrlMetric, Paginated, AgentBreakdown } from '$lib/types';
 	import { dashboardRefreshTrigger } from '$lib/stores';
 	import { onMount } from 'svelte';
 
@@ -88,6 +88,24 @@
 				</div>
 			{/if}
 
+			<!-- Agents -->
+			{#if summary?.agents && summary.agents.length > 0}
+				<div class="section">
+					<div class="section-title">Agents</div>
+					<div class="agent-list">
+						{#each summary.agents as agent}
+							<div class="agent-row">
+								<span class="agent-name">{agent.platform_id ?? 'unknown'}{agent.agent_id ? ` / ${agent.agent_id}` : ''}</span>
+								<div class="agent-stats">
+									<span class="stat">{agent.event_count} events</span>
+									<span class="stat">{agent.session_count} sessions</span>
+								</div>
+							</div>
+						{/each}
+					</div>
+				</div>
+			{/if}
+
 			<!-- Top URLs -->
 			{#if topUrls.length > 0}
 				<div class="section">
@@ -118,6 +136,9 @@
 								<span class="event-badge" class:retrieved={event.event_type === 'content_retrieved'} class:cited={event.event_type === 'content_cited'} class:engaged={event.event_type === 'content_engaged'}>
 									{event.event_type === 'content_retrieved' ? 'RET' : event.event_type === 'content_cited' ? 'CIT' : 'ENG'}
 								</span>
+								{#if event.platform_id}
+									<span class="event-agent">{event.platform_id}</span>
+								{/if}
 								<span class="event-url">{event.content_url ? shortUrl(event.content_url) : '-'}</span>
 								<span class="event-time">{formatTime(event.event_timestamp)}</span>
 							</div>
@@ -210,6 +231,44 @@
 		text-transform: uppercase;
 		letter-spacing: 0.1em;
 		color: #525252;
+	}
+
+	.agent-list {
+		display: flex;
+		flex-direction: column;
+		gap: 0.25rem;
+	}
+
+	.agent-row {
+		padding: 0.4rem 0.6rem;
+		background: #141414;
+		border: 1px solid #1a1a1a;
+		border-radius: 4px;
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+	}
+
+	.agent-name {
+		font-size: 0.7rem;
+		color: #38bdf8;
+		font-family: 'SF Mono', 'Fira Code', monospace;
+	}
+
+	.agent-stats {
+		display: flex;
+		gap: 0.75rem;
+	}
+
+	.event-agent {
+		font-size: 0.55rem;
+		font-weight: 600;
+		padding: 0.1rem 0.3rem;
+		border-radius: 2px;
+		background: #0c2d48;
+		color: #38bdf8;
+		flex-shrink: 0;
+		font-family: 'SF Mono', 'Fira Code', monospace;
 	}
 
 	.url-list, .events-list {
